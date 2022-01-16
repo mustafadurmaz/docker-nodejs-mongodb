@@ -1,0 +1,172 @@
+version: '3.3'
+services:
+
+  zookeeper:
+    container_name: ${ZOOKEEPER_SERVICE_NAME}
+    image: ${ZOOKEEPER_IMAGE}
+    restart: always
+    ports:
+      - ${ZOOKEEPER_PORT}:${ZOOKEEPER_PORT}
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    networks:
+      - mynetwork
+      # volumes: null
+      # - zoodata:/var/lib/zookeeper/data
+      # - zoolog:/var/lib/zookeeper/log
+
+  kafka:
+    container_name: ${KAFKA_SERVICE_NAME}
+    image: ${KAFKA_IMAGE}
+    restart: always
+    ports:
+      - ${KAFKA_PORT}:${KAFKA_PORT}
+    hostname: 'kafka'
+    environment:
+      - KAFKA_ADVERTISED_HOST_NAME=kafka
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      #- PLAINTEXT_HOST://localhost:9092
+      # - KAFKA_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_DELETE_TOPIC_ENABLE=true
+      - KAFKA_LISTENERS=PLAINTEXT://:${KAFKA_PORT}
+      #- KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka-internal:${KAFKA_PORT}
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:${ZOOKEEPER_PORT}
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CREATE_TOPICS="patika-test"
+    depends_on:
+      - zookeeper
+    #expose:
+    #  - "9093"
+    links:
+      - zookeeper:zookeeper
+    networks:
+      - mynetwork
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # - kafkadata:/var/lib/kafka/data
+
+  postgres:
+    container_name: ${PG_SERVICE_NAME}
+    image: ${PG_IMAGE}
+    restart: always
+    environment:
+      POSTGRES_DB: patika_nodejs_bootcamp
+      POSTGRES_USER: patika
+      POSTGRES_PASSWORD: lizaliza
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - /f/dev/nodejsyeni/data/pg:/mnt/sda1/var/lib/docker/volumes/patikadev_postgres_data/_data
+      # - ./data/pgsql:/var/lib/postgresql/data
+      # - pgdata:/var/lib/postgresql/data
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - mynetwork
+
+  pgadmin4:
+    container_name: ${PG_ADMIN_SERVICE_NAME}
+    image: ${PG_ADMIN_IMAGE}
+    ports:
+      - ${PG_ADMIN_PORT}
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PG_ADMIN_USER}
+      PGADMIN_DEFAULT_PASSWORD: ${PG_ADMIN_PASS}
+    volumes:
+      # sets up a default server in the pgadmin interface
+      - ./servers.json:/pgadmin4/${PG_ADMIN_DEFAULT_SERVER_PATH}
+    networks:
+      - mynetwork
+  redis:
+    container_name: ${REDIS_SERVICE_NAME}
+    image: ${REDIS_IMAGE}
+    restart: always
+    hostname: 'redis'
+    #command: ["redis", "--bind", "redis", "--port", "6379"]
+    #command: >
+    #      --requirepass ${REDIS_PASS}
+    ports:
+      - ${REDIS_PORT}:${REDIS_PORT}
+      #environment:
+      # - REDIS_DISABLE_COMMANDS=FLUSHDB,FLUSHALL
+    networks:
+      - mynetwork
+
+  redisinsight:
+    container_name: ${REDIS_MANAGE_SERVICE_NAME}
+    image: ${REDIS_MANAGE_IMAGE}
+    restart: always
+    ports:
+      - ${REDIS_MANAGE_PORT}:${REDIS_MANAGE_PORT}
+    volumes:
+      # sets up a default server in the pgadmin interface
+      - ./data/redisinsight:/db
+    networks:
+      - mynetwork
+
+  mongodb:
+    container_name: ${MONGO_SERVICE_NAME}
+    image: ${MONGO_IMAGE}
+    ports:
+      - ${MONGO_PORT}:${MONGO_PORT}
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASS}
+    networks:
+      - mynetwork
+
+  mongo-express:
+    container_name: ${MONGO_MANAGE_SERVICE_NAME}
+    image: ${MONGO_MANAGE_IMAGE}
+    restart: always
+    ports:
+      - ${MONGO_MANAGE_PORT}:${MONGO_MANAGE_PORT}
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_MANAGE_USER}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_MANAGE_PASS}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASS}@${MONGO_HOST}:${MONGO_PORT}/
+    networks:
+      - mynetwork
+
+  web:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    #image: patikadev_web
+    build:
+      context: .
+      dockerfile: dockerfile
+    ports:
+      - 3000:3000
+
+    environment:
+      # Environment vars used for pg node module
+      PORT: 3000
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: patika
+      POSTGRES_PASSWORD: lizaliza
+      POSTGRES_DB: patika_nodejs_bootcamp
+      PGPORT: 5432
+      NODE_ENV: development
+    depends_on:
+      - kafka
+      - postgres
+      - redis
+      - mongodb
+    links:
+      - kafka:kafka
+      - redis:redis
+      - mongodb:mongodb
+    volumes:
+      - /f/dev/nodejsyeni:/data/app/
+      - /f/dev/nodejsyeni/node_modules:/data/node_modules/
+    networks:
+      - mynetwork
+    command: npm run dev
+networks:
+  mynetwork:
+    driver: bridge
+
+volumes:
+  postgres_data:
+
+    null

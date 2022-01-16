@@ -1,0 +1,20 @@
+FROM node:17-alpine
+
+WORKDIR /data/
+COPY ./new/package.json /data/
+RUN npm install
+RUN npm i -D nodemon
+ENV PATH /data/node_modules/.bin:$PATH
+
+COPY . /data/app/
+WORKDIR /data/app/
+
+
+
+
+
+
+
+
+
+
